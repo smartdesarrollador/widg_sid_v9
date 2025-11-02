@@ -39,6 +39,9 @@ class Sidebar(QWidget):
     # Signal emitted when global search button is clicked
     global_search_clicked = pyqtSignal()
 
+    # Signal emitted when browser button is clicked
+    browser_clicked = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.category_buttons = {}
@@ -290,6 +293,36 @@ class Sidebar(QWidget):
         self.stats_button.clicked.connect(self.on_stats_clicked)
         main_layout.addWidget(self.stats_button)
 
+        # Browser button
+        self.browser_button = QPushButton("🌐")
+        self.browser_button.setFixedSize(70, 45)
+        self.browser_button.setToolTip("Navegador Web")
+        self.browser_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.browser_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.theme.get_color('background_deep')};
+                color: {self.theme.get_color('text_secondary')};
+                border: none;
+                border-top: 2px solid {self.theme.get_color('surface')};
+                font-size: 14pt;
+            }}
+            QPushButton:hover {{
+                background: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {self.theme.get_color('primary')},
+                    stop:1 {self.theme.get_color('surface')}
+                );
+                color: {self.theme.get_color('accent')};
+                border-top: 2px solid {self.theme.get_color('accent')};
+            }}
+            QPushButton:pressed {{
+                background-color: {self.theme.get_color('primary')};
+                color: {self.theme.get_color('text_primary')};
+            }}
+        """)
+        self.browser_button.clicked.connect(self.on_browser_clicked)
+        main_layout.addWidget(self.browser_button)
+
         # Dashboard button
         self.dashboard_button = QPushButton("🗂️")
         self.dashboard_button.setFixedSize(70, 45)
@@ -459,6 +492,10 @@ class Sidebar(QWidget):
     def on_stats_clicked(self):
         """Handle stats button click"""
         self.stats_clicked.emit()
+
+    def on_browser_clicked(self):
+        """Handle browser button click"""
+        self.browser_clicked.emit()
 
     def on_settings_clicked(self):
         """Handle settings button click"""

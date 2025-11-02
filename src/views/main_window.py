@@ -206,6 +206,7 @@ class MainWindow(QMainWindow):
         self.sidebar.global_search_clicked.connect(self.on_global_search_clicked)
         self.sidebar.favorites_clicked.connect(self.on_favorites_clicked)
         self.sidebar.stats_clicked.connect(self.on_stats_clicked)
+        self.sidebar.browser_clicked.connect(self.on_browser_clicked)
         self.sidebar.dashboard_clicked.connect(self.open_structure_dashboard)
         self.sidebar.settings_clicked.connect(self.open_settings)
         self.sidebar.category_filter_clicked.connect(self.on_category_filter_clicked)
@@ -523,6 +524,25 @@ class MainWindow(QMainWindow):
         if self.stats_panel:
             self.stats_panel.deleteLater()
             self.stats_panel = None
+
+    def on_browser_clicked(self):
+        """Handle browser button click - toggle browser window"""
+        try:
+            logger.info("Browser button clicked")
+
+            # Delegar al controller para toggle del navegador
+            if self.controller:
+                self.controller.toggle_browser()
+            else:
+                logger.warning("Controller not available")
+
+        except Exception as e:
+            logger.error(f"Error in on_browser_clicked: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al abrir navegador:\n{str(e)}"
+            )
 
     def open_structure_dashboard(self):
         """Open the structure dashboard"""

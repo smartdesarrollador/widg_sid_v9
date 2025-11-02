@@ -19,6 +19,7 @@ from views.category_editor import CategoryEditor
 from views.appearance_settings import AppearanceSettings
 from views.hotkey_settings import HotkeySettings
 from views.general_settings import GeneralSettings
+from views.browser_settings import BrowserSettings
 
 # Get logger
 logger = logging.getLogger(__name__)
@@ -127,12 +128,14 @@ class SettingsWindow(QDialog):
         self.category_editor = CategoryEditor(controller=self.controller)
         self.appearance_settings = AppearanceSettings(config_manager=self.config_manager)
         self.hotkey_settings = HotkeySettings(config_manager=self.config_manager)
+        self.browser_settings = BrowserSettings(controller=self.controller)
         self.general_settings = GeneralSettings(config_manager=self.config_manager)
 
         # Add tabs
         self.tab_widget.addTab(self.category_editor, "Categorías")
         self.tab_widget.addTab(self.appearance_settings, "Apariencia")
         self.tab_widget.addTab(self.hotkey_settings, "Hotkeys")
+        self.tab_widget.addTab(self.browser_settings, "Navegador")
         self.tab_widget.addTab(self.general_settings, "General")
 
         main_layout.addWidget(self.tab_widget)

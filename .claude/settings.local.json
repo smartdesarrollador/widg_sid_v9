@@ -33,7 +33,8 @@
       "Bash(findstr:*)",
       "Bash(timeout:*)",
       "Bash(nul)",
-      "Bash(copy .env backup_2025-11-01_23-25-09.env)"
+      "Bash(copy .env backup_2025-11-01_23-25-09.env)",
+      "Bash(pip install:*)"
     ],
     "deny": [],
     "ask": []

@@ -177,6 +177,17 @@ class DBManager:
                 FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
             );
 
+            -- Tabla de configuración del navegador embebido
+            CREATE TABLE IF NOT EXISTS browser_config (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                home_url TEXT DEFAULT 'https://www.google.com',
+                is_visible BOOLEAN DEFAULT 0,
+                width INTEGER DEFAULT 500,
+                height INTEGER DEFAULT 700,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
             -- Índices para optimización
             CREATE INDEX IF NOT EXISTS idx_categories_order ON categories(order_index);
             CREATE INDEX IF NOT EXISTS idx_items_category ON items(category_id);
@@ -1361,6 +1372,105 @@ class DBManager:
         """
         result = self.execute_query(query, (category_id,))
         return result[0] if result else None
+
+    # ========== BROWSER CONFIG ==========
+
+    def get_browser_config(self) -> Dict:
+        """
+        Get browser configuration from database.
+
+        Returns:
+            Dict: Browser configuration or default values if not exists
+        """
+        query = "SELECT * FROM browser_config LIMIT 1"
+        try:
+            result = self.execute_query(query)
+            if result:
+                config = result[0]
+                logger.debug(f"Browser config loaded: {config}")
+                return config
+            else:
+                # No config exists, insert default
+                logger.info("No browser config found, creating default")
+                default_config = {
+                    'home_url': 'https://www.google.com',
+                    'is_visible': False,
+                    'width': 500,
+                    'height': 700
+                }
+                self.save_browser_config(default_config)
+                return default_config
+        except Exception as e:
+            logger.error(f"Error loading browser config: {e}")
+            # Return default config on error
+            return {
+                'home_url': 'https://www.google.com',
+                'is_visible': False,
+                'width': 500,
+                'height': 700
+            }
+
+    def save_browser_config(self, config: Dict) -> bool:
+        """
+        Save browser configuration to database.
+
+        Args:
+            config: Dictionary with browser settings
+                   (home_url, is_visible, width, height)
+
+        Returns:
+            bool: True if save successful
+        """
+        try:
+            # Check if config exists
+            query = "SELECT id FROM browser_config LIMIT 1"
+            result = self.execute_query(query)
+
+            if result:
+                # Update existing config
+                config_id = result[0]['id']
+                update_query = """
+                    UPDATE browser_config
+                    SET home_url = ?,
+                        is_visible = ?,
+                        width = ?,
+                        height = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """
+                self.execute_update(
+                    update_query,
+                    (
+                        config.get('home_url', 'https://www.google.com'),
+                        config.get('is_visible', False),
+                        config.get('width', 500),
+                        config.get('height', 700),
+                        config_id
+                    )
+                )
+                logger.info(f"Browser config updated: ID {config_id}")
+            else:
+                # Insert new config
+                insert_query = """
+                    INSERT INTO browser_config (home_url, is_visible, width, height)
+                    VALUES (?, ?, ?, ?)
+                """
+                self.execute_update(
+                    insert_query,
+                    (
+                        config.get('home_url', 'https://www.google.com'),
+                        config.get('is_visible', False),
+                        config.get('width', 500),
+                        config.get('height', 700)
+                    )
+                )
+                logger.info("Browser config created")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error saving browser config: {e}")
+            return False
 
     def __enter__(self):
         """Context manager entry"""
