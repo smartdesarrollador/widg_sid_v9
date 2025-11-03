@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QTimer
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
+from PyQt6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile, QWebEnginePage
 
 logger = logging.getLogger(__name__)
 
@@ -56,17 +56,19 @@ class SimpleBrowserWindow(QWidget):
     # Señales
     closed = pyqtSignal()
 
-    def __init__(self, url: str = "https://www.google.com", db_manager=None):
+    def __init__(self, url: str = "https://www.google.com", db_manager=None, profile_manager=None):
         """
         Inicializa la ventana del navegador.
 
         Args:
             url: URL inicial a cargar
             db_manager: Instancia de DBManager para manejar marcadores y sesiones
+            profile_manager: Instancia de BrowserProfileManager para perfiles persistentes
         """
         super().__init__()
         self.url = url
         self.db = db_manager
+        self.profile_manager = profile_manager
         self.appbar_registered = False  # Estado del AppBar
 
         # Variables para redimensionamiento
@@ -80,6 +82,15 @@ class SimpleBrowserWindow(QWidget):
         self.tabs = []  # Lista de QWebEngineView (una por pestaña)
         self.tab_widget = None  # QTabWidget
         self.is_loading = False  # Estado de carga
+
+        # Perfil de navegador persistente
+        self.web_profile = None
+        if self.profile_manager:
+            self.web_profile = self.profile_manager.get_or_create_profile()
+            if self.web_profile:
+                logger.info("Perfil persistente cargado - cookies y sesiones se guardarán")
+            else:
+                logger.warning("No se pudo cargar perfil persistente - usando perfil temporal")
 
         # Gestor de sesiones
         self.session_manager = None
@@ -422,8 +433,16 @@ class SimpleBrowserWindow(QWidget):
             url: URL inicial de la pestaña
             title: Título de la pestaña
         """
-        # Crear nuevo QWebEngineView
+        # Crear nuevo QWebEngineView con perfil persistente
         browser = QWebEngineView()
+
+        # Si tenemos perfil persistente, crear página con ese perfil
+        if self.web_profile:
+            page = QWebEnginePage(self.web_profile, browser)
+            browser.setPage(page)
+            logger.debug("Pestaña creada con perfil persistente")
+        else:
+            logger.debug("Pestaña creada con perfil temporal (por defecto)")
 
         # Configurar el navegador
         settings = browser.settings()

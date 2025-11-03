@@ -1499,6 +1499,203 @@ class DBManager:
             logger.error(f"Error saving browser config: {e}")
             return False
 
+    # ==================== Browser Profiles Management ====================
+
+    def get_browser_profiles(self) -> List[Dict]:
+        """
+        Get all browser profiles.
+
+        Returns:
+            List[Dict]: List of browser profiles
+        """
+        query = """
+            SELECT id, name, storage_path, is_default, created_at, last_used
+            FROM browser_profiles
+            ORDER BY is_default DESC, last_used DESC
+        """
+        try:
+            result = self.execute_query(query)
+            logger.debug(f"Retrieved {len(result) if result else 0} browser profiles")
+            return result if result else []
+        except Exception as e:
+            logger.error(f"Error getting browser profiles: {e}")
+            return []
+
+    def get_default_profile(self) -> Optional[Dict]:
+        """
+        Get the default browser profile.
+
+        Returns:
+            Dict: Default profile or None
+        """
+        query = """
+            SELECT id, name, storage_path, is_default, created_at, last_used
+            FROM browser_profiles
+            WHERE is_default = 1
+            LIMIT 1
+        """
+        try:
+            result = self.execute_query(query)
+            if result:
+                logger.debug(f"Default profile: {result[0]['name']}")
+                return result[0]
+            else:
+                logger.warning("No default profile found")
+                return None
+        except Exception as e:
+            logger.error(f"Error getting default profile: {e}")
+            return None
+
+    def get_profile_by_id(self, profile_id: int) -> Optional[Dict]:
+        """
+        Get browser profile by ID.
+
+        Args:
+            profile_id: Profile ID
+
+        Returns:
+            Dict: Profile data or None
+        """
+        query = """
+            SELECT id, name, storage_path, is_default, created_at, last_used
+            FROM browser_profiles
+            WHERE id = ?
+        """
+        try:
+            result = self.execute_query(query, (profile_id,))
+            return result[0] if result else None
+        except Exception as e:
+            logger.error(f"Error getting profile {profile_id}: {e}")
+            return None
+
+    def add_browser_profile(self, name: str, storage_path: str = None) -> Optional[int]:
+        """
+        Add a new browser profile.
+
+        Args:
+            name: Profile name
+            storage_path: Custom storage path (optional, auto-generated if None)
+
+        Returns:
+            int: Profile ID or None if failed
+        """
+        try:
+            # Auto-generate storage path if not provided
+            if not storage_path:
+                # Sanitize name for path
+                import re
+                safe_name = re.sub(r'[^\w\-]', '_', name.lower())
+                storage_path = f"browser_data/{safe_name}"
+
+            # Check if name already exists
+            check_query = "SELECT id FROM browser_profiles WHERE name = ?"
+            existing = self.execute_query(check_query, (name,))
+
+            if existing:
+                logger.warning(f"Profile with name '{name}' already exists")
+                return None
+
+            # Insert new profile
+            insert_query = """
+                INSERT INTO browser_profiles (name, storage_path, is_default)
+                VALUES (?, ?, 0)
+            """
+            self.execute_update(insert_query, (name, storage_path))
+
+            # Get inserted ID
+            last_id_query = "SELECT last_insert_rowid() as id"
+            result = self.execute_query(last_id_query)
+            profile_id = result[0]['id'] if result else None
+
+            logger.info(f"Browser profile created: '{name}' (ID: {profile_id})")
+            return profile_id
+
+        except Exception as e:
+            logger.error(f"Error adding browser profile: {e}")
+            return None
+
+    def delete_browser_profile(self, profile_id: int) -> bool:
+        """
+        Delete a browser profile.
+
+        Args:
+            profile_id: Profile ID
+
+        Returns:
+            bool: True if deleted successfully
+        """
+        try:
+            # Check if it's the default profile
+            profile = self.get_profile_by_id(profile_id)
+            if not profile:
+                logger.warning(f"Profile {profile_id} not found")
+                return False
+
+            if profile['is_default']:
+                logger.warning("Cannot delete default profile")
+                return False
+
+            # Delete profile
+            delete_query = "DELETE FROM browser_profiles WHERE id = ?"
+            self.execute_update(delete_query, (profile_id,))
+
+            logger.info(f"Browser profile {profile_id} deleted")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error deleting browser profile: {e}")
+            return False
+
+    def set_default_profile(self, profile_id: int) -> bool:
+        """
+        Set a profile as default.
+
+        Args:
+            profile_id: Profile ID
+
+        Returns:
+            bool: True if successful
+        """
+        try:
+            # Remove default from all profiles
+            update_all_query = "UPDATE browser_profiles SET is_default = 0"
+            self.execute_update(update_all_query)
+
+            # Set new default
+            update_query = "UPDATE browser_profiles SET is_default = 1 WHERE id = ?"
+            self.execute_update(update_query, (profile_id,))
+
+            logger.info(f"Profile {profile_id} set as default")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error setting default profile: {e}")
+            return False
+
+    def update_profile_last_used(self, profile_id: int) -> bool:
+        """
+        Update the last_used timestamp for a profile.
+
+        Args:
+            profile_id: Profile ID
+
+        Returns:
+            bool: True if successful
+        """
+        try:
+            update_query = """
+                UPDATE browser_profiles
+                SET last_used = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """
+            self.execute_update(update_query, (profile_id,))
+            logger.debug(f"Profile {profile_id} last_used updated")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating profile last_used: {e}")
+            return False
+
     # ==================== Bookmarks Management ====================
 
     def add_bookmark(self, title: str, url: str, folder: str = None) -> Optional[int]:

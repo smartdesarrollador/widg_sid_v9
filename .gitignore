@@ -73,7 +73,12 @@ installer/
 
 
 # utilities
-util/
+util/capturas/
+util/test_*.py
+util/debug_*.py
+
+# Browser persistent data (cookies, cache, sessions)
+browser_data/
 
 # Documentation (local only)
 FASE*_AUTH_COMPLETADA.md

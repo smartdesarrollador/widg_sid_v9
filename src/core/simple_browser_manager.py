@@ -19,6 +19,7 @@ class SimpleBrowserManager:
     - Toggle show/hide del navegador
     - Cargar/guardar configuración básica (URL home)
     - Lazy loading para evitar cuelgues
+    - Gestionar perfiles persistentes del navegador
     """
 
     def __init__(self, db_manager, main_window=None):
@@ -34,7 +35,11 @@ class SimpleBrowserManager:
         self.browser_window: Optional['SimpleBrowserWindow'] = None
         self._home_url: Optional[str] = None
 
-        logger.info("SimpleBrowserManager inicializado")
+        # Inicializar BrowserProfileManager para persistencia de sesiones web
+        from src.core.browser_profile_manager import BrowserProfileManager
+        self.profile_manager = BrowserProfileManager(db_manager)
+
+        logger.info("SimpleBrowserManager inicializado con perfil persistente")
 
     def toggle_browser(self):
         """
@@ -70,8 +75,12 @@ class SimpleBrowserManager:
             width = config.get('width', 500)
             height = config.get('height', 700)
 
-            # Crear ventana pasando el DBManager para los marcadores
-            self.browser_window = SimpleBrowserWindow(home_url, db_manager=self.db)
+            # Crear ventana pasando el DBManager y ProfileManager
+            self.browser_window = SimpleBrowserWindow(
+                home_url,
+                db_manager=self.db,
+                profile_manager=self.profile_manager
+            )
 
             # Aplicar tamaño configurado
             self.browser_window.resize(width, height)
@@ -228,5 +237,9 @@ class SimpleBrowserManager:
 
         if self.browser_window:
             self.close_browser()
+
+        # Limpiar profile manager
+        if self.profile_manager:
+            self.profile_manager.cleanup()
 
         logger.info("SimpleBrowserManager limpiado")
