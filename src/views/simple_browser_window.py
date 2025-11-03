@@ -11,7 +11,7 @@ from ctypes import wintypes
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
-    QPushButton, QLabel, QApplication, QTabWidget, QTabBar
+    QPushButton, QLabel, QApplication, QTabWidget, QTabBar, QMenu
 )
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QTimer
 from PyQt6.QtWebEngineWidgets import QWebEngineView
@@ -219,6 +219,13 @@ class SimpleBrowserWindow(QWidget):
         self.reload_btn.setToolTip("Recargar página")
         self.reload_btn.clicked.connect(self.reload_page)
         nav_layout.addWidget(self.reload_btn)
+
+        # Botón listado de pestañas
+        self.tabs_list_btn = QPushButton("☰")
+        self.tabs_list_btn.setFixedWidth(40)
+        self.tabs_list_btn.setToolTip("Ver todas las pestañas")
+        self.tabs_list_btn.clicked.connect(self.show_tabs_menu)
+        nav_layout.addWidget(self.tabs_list_btn)
 
         # Botón cerrar
         self.close_btn = QPushButton("✕")
@@ -716,6 +723,107 @@ class SimpleBrowserWindow(QWidget):
         """Handler cuando se selecciona un marcador del panel."""
         logger.info(f"Navegando a marcador: {url}")
         self.load_url(url)
+
+    def show_tabs_menu(self):
+        """Muestra un menú desplegable con todas las pestañas abiertas."""
+        if len(self.tabs) == 0:
+            logger.debug("No hay pestañas para mostrar")
+            return
+
+        # Crear menú
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #1a1a2e;
+                border: 2px solid #00d4ff;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QMenu::item {
+                background-color: transparent;
+                color: #00d4ff;
+                padding: 8px 20px;
+                border-radius: 3px;
+                font-size: 11px;
+            }
+            QMenu::item:selected {
+                background-color: #0f3460;
+                border: 1px solid #00d4ff;
+            }
+            QMenu::item:disabled {
+                background-color: #16213e;
+                color: #ffffff;
+                font-weight: bold;
+            }
+            QMenu::separator {
+                height: 1px;
+                background-color: #0f3460;
+                margin: 5px 0px;
+            }
+        """)
+
+        # Obtener índice de pestaña activa
+        current_index = self.tab_widget.currentIndex()
+
+        # Agregar cada pestaña al menú
+        for i, browser in enumerate(self.tabs):
+            # Obtener título y URL de la pestaña
+            title = browser.title() or "Nueva pestaña"
+            url = browser.url().toString()
+
+            # Limitar el título a 50 caracteres
+            if len(title) > 50:
+                title = title[:47] + "..."
+
+            # Crear texto del item del menú
+            if i == current_index:
+                # Pestaña activa: marcar con ✓ y deshabilitarla
+                item_text = f"✓ {title}"
+                action = menu.addAction(item_text)
+                action.setEnabled(False)  # Deshabilitar pestaña activa
+            else:
+                # Otras pestañas
+                item_text = f"  {title}"
+                action = menu.addAction(item_text)
+                action.setData(i)  # Guardar el índice en los datos de la acción
+                action.triggered.connect(lambda checked, idx=i: self._switch_to_tab(idx))
+
+            # Agregar tooltip con la URL completa
+            action.setToolTip(url)
+
+        # Agregar separador y opción de cerrar todas las pestañas (excepto activa)
+        if len(self.tabs) > 1:
+            menu.addSeparator()
+            close_others_action = menu.addAction("Cerrar otras pestañas")
+            close_others_action.triggered.connect(self._close_other_tabs)
+
+        # Mostrar el menú debajo del botón
+        button_pos = self.tabs_list_btn.mapToGlobal(self.tabs_list_btn.rect().bottomLeft())
+        menu.exec(button_pos)
+
+        logger.debug(f"Menú de pestañas mostrado con {len(self.tabs)} pestañas")
+
+    def _switch_to_tab(self, index: int):
+        """
+        Cambia a una pestaña específica.
+
+        Args:
+            index: Índice de la pestaña
+        """
+        if 0 <= index < len(self.tabs):
+            self.tab_widget.setCurrentIndex(index)
+            logger.debug(f"Cambiado a pestaña {index}")
+
+    def _close_other_tabs(self):
+        """Cierra todas las pestañas excepto la activa."""
+        current_index = self.tab_widget.currentIndex()
+
+        # Cerrar pestañas desde el final hacia el principio (para no afectar índices)
+        for i in range(len(self.tabs) - 1, -1, -1):
+            if i != current_index:
+                self._on_close_tab(i)
+
+        logger.info(f"Cerradas todas las pestañas excepto la activa")
 
     # ==================== Slots ====================
 
