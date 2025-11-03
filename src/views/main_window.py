@@ -157,26 +157,6 @@ class MainWindow(QMainWindow):
         # Spacer
         title_bar_layout.addStretch()
 
-        # Minimize button
-        self.minimize_button = QPushButton("─")
-        self.minimize_button.setFixedSize(25, 25)
-        self.minimize_button.setStyleSheet("""
-            QPushButton {
-                background-color: #2d2d2d;
-                color: #cccccc;
-                border: 1px solid #3d3d3d;
-                border-radius: 3px;
-                font-size: 14pt;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #3d3d3d;
-                border: 1px solid #007acc;
-            }
-        """)
-        self.minimize_button.clicked.connect(self.minimize_window)
-        title_bar_layout.addWidget(self.minimize_button)
-
         # Close button
         self.close_button = QPushButton("✕")
         self.close_button.setFixedSize(25, 25)
