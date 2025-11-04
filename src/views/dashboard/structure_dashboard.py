@@ -56,6 +56,8 @@ class StructureDashboard(QDialog):
         # Tracking de filtros activos
         self.active_filter = None  # 'favorites', 'inactive', 'archived', None
         self.filter_buttons = {}  # Referencias a los botones de filtro
+        self.active_type_filters = set()  # Set of active item types ('URL', 'CODE', 'PATH', 'TEXT')
+        self.type_filter_buttons = {}  # Referencias a los botones de filtro de tipo
 
         self.init_ui()
         self.setup_shortcuts()
@@ -240,7 +242,7 @@ class StructureDashboard(QDialog):
     def create_header(self) -> QWidget:
         """Create header widget with title and buttons"""
         header = QWidget()
-        header.setFixedHeight(60)
+        header.setFixedHeight(100)  # Aumentado para 2 filas
         header.setStyleSheet("""
             QWidget {
                 background-color: #252525;
@@ -248,9 +250,14 @@ class StructureDashboard(QDialog):
             }
         """)
 
-        layout = QHBoxLayout(header)
-        layout.setContentsMargins(20, 10, 10, 10)  # Reduced right margin
-        layout.setSpacing(8)  # Add spacing between elements
+        # Layout principal vertical para 2 filas
+        main_layout = QVBoxLayout(header)
+        main_layout.setContentsMargins(10, 5, 10, 5)
+        main_layout.setSpacing(5)
+
+        # ========== FILA 1: Título + Controles de ventana ==========
+        row1_layout = QHBoxLayout()
+        row1_layout.setSpacing(8)
 
         # Draggable title area
         self.title_label = QLabel("📊 Dashboard de Estructura")
@@ -271,49 +278,8 @@ class StructureDashboard(QDialog):
         self.title_label.mouseMoveEvent = self.header_mouse_move
         self.title_label.mouseReleaseEvent = self.header_mouse_release
 
-        layout.addWidget(self.title_label)
-
-        layout.addStretch()
-
-        # Filter buttons (con indicador visual cuando están activos)
-        self.fav_btn = QPushButton("⭐ Favoritos")
-        self.fav_btn.setToolTip("Mostrar solo items favoritos")
-        self.fav_btn.clicked.connect(self.filter_favorites)
-        self.fav_btn.setCheckable(True)  # Hacer que el botón sea checkable
-        layout.addWidget(self.fav_btn)
-        self.filter_buttons['favorites'] = self.fav_btn
-
-        self.inactive_btn = QPushButton("🚫 Desactivados")
-        self.inactive_btn.setToolTip("Mostrar solo items/categorías desactivados")
-        self.inactive_btn.clicked.connect(self.filter_inactive)
-        self.inactive_btn.setCheckable(True)
-        layout.addWidget(self.inactive_btn)
-        self.filter_buttons['inactive'] = self.inactive_btn
-
-        self.archived_btn = QPushButton("📦 Archivados")
-        self.archived_btn.setToolTip("Mostrar solo items archivados")
-        self.archived_btn.clicked.connect(self.filter_archived)
-        self.archived_btn.setCheckable(True)
-        layout.addWidget(self.archived_btn)
-        self.filter_buttons['archived'] = self.archived_btn
-
-        sort_btn = QPushButton("🔢 +Items")
-        sort_btn.setToolTip("Ordenar por cantidad de items (desc)")
-        sort_btn.clicked.connect(self.sort_by_items)
-        layout.addWidget(sort_btn)
-
-        reset_btn = QPushButton("↺ Todo")
-        reset_btn.setToolTip("Mostrar todo sin filtros")
-        reset_btn.clicked.connect(self.reset_filters)
-        layout.addWidget(reset_btn)
-
-        # Refresh button
-        refresh_btn = QPushButton("🔄 Refrescar")
-        refresh_btn.clicked.connect(self.refresh_data)
-        layout.addWidget(refresh_btn)
-
-        # Add spacer before window controls
-        layout.addSpacing(20)
+        row1_layout.addWidget(self.title_label)
+        row1_layout.addStretch()
 
         # Window control buttons - with better visibility
         window_controls_style = """
@@ -340,7 +306,7 @@ class StructureDashboard(QDialog):
         minimize_btn.setFixedSize(40, 35)
         minimize_btn.setStyleSheet(window_controls_style)
         minimize_btn.clicked.connect(self.showMinimized)
-        layout.addWidget(minimize_btn)
+        row1_layout.addWidget(minimize_btn)
 
         # Maximize/Restore button
         self.maximize_btn = QPushButton("□")
@@ -348,7 +314,7 @@ class StructureDashboard(QDialog):
         self.maximize_btn.setFixedSize(40, 35)
         self.maximize_btn.setStyleSheet(window_controls_style)
         self.maximize_btn.clicked.connect(self.toggle_maximize)
-        layout.addWidget(self.maximize_btn)
+        row1_layout.addWidget(self.maximize_btn)
 
         # Close button - with red hover
         close_btn = QPushButton("✕")
@@ -372,7 +338,90 @@ class StructureDashboard(QDialog):
             }
         """)
         close_btn.clicked.connect(self.close)
-        layout.addWidget(close_btn)
+        row1_layout.addWidget(close_btn)
+
+        main_layout.addLayout(row1_layout)
+
+        # ========== FILA 2: Filtros de estado + Filtros de tipo + Acciones ==========
+        row2_layout = QHBoxLayout()
+        row2_layout.setSpacing(8)
+
+        # Filtros de estado
+        self.fav_btn = QPushButton("⭐ Favoritos")
+        self.fav_btn.setToolTip("Mostrar solo items favoritos")
+        self.fav_btn.clicked.connect(self.filter_favorites)
+        self.fav_btn.setCheckable(True)
+        row2_layout.addWidget(self.fav_btn)
+        self.filter_buttons['favorites'] = self.fav_btn
+
+        self.inactive_btn = QPushButton("🚫 Desactivados")
+        self.inactive_btn.setToolTip("Mostrar solo items/categorías desactivados")
+        self.inactive_btn.clicked.connect(self.filter_inactive)
+        self.inactive_btn.setCheckable(True)
+        row2_layout.addWidget(self.inactive_btn)
+        self.filter_buttons['inactive'] = self.inactive_btn
+
+        self.archived_btn = QPushButton("📦 Archivados")
+        self.archived_btn.setToolTip("Mostrar solo items archivados")
+        self.archived_btn.clicked.connect(self.filter_archived)
+        self.archived_btn.setCheckable(True)
+        row2_layout.addWidget(self.archived_btn)
+        self.filter_buttons['archived'] = self.archived_btn
+
+        # Separador visual
+        row2_layout.addSpacing(15)
+
+        # Filtros de tipo (múltiple selección permitida)
+        self.url_type_btn = QPushButton("🔗 URL")
+        self.url_type_btn.setToolTip("Filtrar items de tipo URL")
+        self.url_type_btn.clicked.connect(lambda: self.toggle_type_filter('URL'))
+        self.url_type_btn.setCheckable(True)
+        row2_layout.addWidget(self.url_type_btn)
+        self.type_filter_buttons['URL'] = self.url_type_btn
+
+        self.code_type_btn = QPushButton("💻 CODE")
+        self.code_type_btn.setToolTip("Filtrar items de tipo CODE")
+        self.code_type_btn.clicked.connect(lambda: self.toggle_type_filter('CODE'))
+        self.code_type_btn.setCheckable(True)
+        row2_layout.addWidget(self.code_type_btn)
+        self.type_filter_buttons['CODE'] = self.code_type_btn
+
+        self.path_type_btn = QPushButton("📂 PATH")
+        self.path_type_btn.setToolTip("Filtrar items de tipo PATH")
+        self.path_type_btn.clicked.connect(lambda: self.toggle_type_filter('PATH'))
+        self.path_type_btn.setCheckable(True)
+        row2_layout.addWidget(self.path_type_btn)
+        self.type_filter_buttons['PATH'] = self.path_type_btn
+
+        self.text_type_btn = QPushButton("📝 TEXT")
+        self.text_type_btn.setToolTip("Filtrar items de tipo TEXT")
+        self.text_type_btn.clicked.connect(lambda: self.toggle_type_filter('TEXT'))
+        self.text_type_btn.setCheckable(True)
+        row2_layout.addWidget(self.text_type_btn)
+        self.type_filter_buttons['TEXT'] = self.text_type_btn
+
+        # Separador visual
+        row2_layout.addSpacing(15)
+
+        # Botones de acción
+        sort_btn = QPushButton("🔢 +Items")
+        sort_btn.setToolTip("Ordenar por cantidad de items (desc)")
+        sort_btn.clicked.connect(self.sort_by_items)
+        row2_layout.addWidget(sort_btn)
+
+        reset_btn = QPushButton("↺ Todo")
+        reset_btn.setToolTip("Mostrar todo sin filtros")
+        reset_btn.clicked.connect(self.reset_filters)
+        row2_layout.addWidget(reset_btn)
+
+        # Refresh button
+        refresh_btn = QPushButton("🔄 Refrescar")
+        refresh_btn.clicked.connect(self.refresh_data)
+        row2_layout.addWidget(refresh_btn)
+
+        row2_layout.addStretch()
+
+        main_layout.addLayout(row2_layout)
 
         return header
 
@@ -1531,14 +1580,33 @@ class StructureDashboard(QDialog):
         self.set_active_filter('favorites')
 
         # Filtrar estructura
-        state_filters = {'favorites': True, 'sensitive': False, 'normal': False}
-        filtered_structure = self.dashboard_manager.filter_and_sort_structure(
-            structure=self.structure,
-            state_filters=state_filters
-        )
+        import copy
+        filtered_structure = copy.deepcopy(self.structure)
+
+        # Filter favorite items
+        for category in filtered_structure['categories']:
+            category['items'] = [
+                item for item in category['items']
+                if item.get('is_favorite', False)
+            ]
+
+        # Also apply type filters if active
+        if self.active_type_filters:
+            for category in filtered_structure['categories']:
+                category['items'] = [
+                    item for item in category['items']
+                    if item.get('type') in self.active_type_filters
+                ]
+
         self.tree_widget.clear()
         self.populate_tree(filtered_structure)
-        self.stats_label.setText("🔍 Mostrando solo favoritos")
+
+        # Update stats label
+        msg = "🔍 Mostrando solo favoritos"
+        if self.active_type_filters:
+            types_str = ', '.join(sorted(self.active_type_filters))
+            msg += f" (tipos: {types_str})"
+        self.stats_label.setText(msg)
 
     def filter_inactive(self):
         """Show only inactive items/categories"""
@@ -1559,9 +1627,23 @@ class StructureDashboard(QDialog):
                 if not item.get('is_active', 1)  # Solo items con is_active=0
             ]
 
+        # Also apply type filters if active
+        if self.active_type_filters:
+            for category in filtered_structure['categories']:
+                category['items'] = [
+                    item for item in category['items']
+                    if item.get('type') in self.active_type_filters
+                ]
+
         self.tree_widget.clear()
         self.populate_tree(filtered_structure)
-        self.stats_label.setText("🚫 Mostrando solo desactivados")
+
+        # Update stats label
+        msg = "🚫 Mostrando solo desactivados"
+        if self.active_type_filters:
+            types_str = ', '.join(sorted(self.active_type_filters))
+            msg += f" (tipos: {types_str})"
+        self.stats_label.setText(msg)
 
     def filter_archived(self):
         """Show only archived items"""
@@ -1581,9 +1663,23 @@ class StructureDashboard(QDialog):
                 if item.get('is_archived', False)  # Solo items con is_archived=True
             ]
 
+        # Also apply type filters if active
+        if self.active_type_filters:
+            for category in filtered_structure['categories']:
+                category['items'] = [
+                    item for item in category['items']
+                    if item.get('type') in self.active_type_filters
+                ]
+
         self.tree_widget.clear()
         self.populate_tree(filtered_structure)
-        self.stats_label.setText("📦 Mostrando solo archivados")
+
+        # Update stats label
+        msg = "📦 Mostrando solo archivados"
+        if self.active_type_filters:
+            types_str = ', '.join(sorted(self.active_type_filters))
+            msg += f" (tipos: {types_str})"
+        self.stats_label.setText(msg)
 
     def set_active_filter(self, filter_name):
         """
@@ -1614,6 +1710,89 @@ class StructureDashboard(QDialog):
         self.populate_tree(sorted_structure)
         self.stats_label.setText("🔢 Ordenado por cantidad de items")
 
+    def toggle_type_filter(self, item_type: str):
+        """
+        Toggle type filter on/off (allows multiple types to be selected)
+
+        Args:
+            item_type: Item type ('URL', 'CODE', 'PATH', 'TEXT')
+        """
+        if item_type in self.active_type_filters:
+            # Remove type filter
+            self.active_type_filters.remove(item_type)
+            self.type_filter_buttons[item_type].setChecked(False)
+            logger.info(f"Type filter '{item_type}' removed")
+        else:
+            # Add type filter
+            self.active_type_filters.add(item_type)
+            self.type_filter_buttons[item_type].setChecked(True)
+            logger.info(f"Type filter '{item_type}' added")
+
+        # Apply filters
+        self.apply_type_filters()
+
+    def apply_type_filters(self):
+        """Apply active type filters to the tree"""
+        if not self.active_type_filters:
+            # No type filters active, show all (or apply other active filter)
+            if self.active_filter:
+                # Re-apply the active state filter
+                if self.active_filter == 'favorites':
+                    self.filter_favorites()
+                elif self.active_filter == 'inactive':
+                    self.filter_inactive()
+                elif self.active_filter == 'archived':
+                    self.filter_archived()
+            else:
+                # Show all
+                self.tree_widget.clear()
+                self.populate_tree(self.structure)
+                self.update_statistics()
+            return
+
+        # Filter structure by types
+        import copy
+        filtered_structure = copy.deepcopy(self.structure)
+
+        # Filter items by type
+        for category in filtered_structure['categories']:
+            category['items'] = [
+                item for item in category['items']
+                if item.get('type') in self.active_type_filters
+            ]
+
+        # Also apply state filter if active
+        if self.active_filter == 'favorites':
+            for category in filtered_structure['categories']:
+                category['items'] = [
+                    item for item in category['items']
+                    if item.get('is_favorite', False)
+                ]
+        elif self.active_filter == 'inactive':
+            for category in filtered_structure['categories']:
+                category['items'] = [
+                    item for item in category['items']
+                    if not item.get('is_active', 1)
+                ]
+        elif self.active_filter == 'archived':
+            for category in filtered_structure['categories']:
+                category['items'] = [
+                    item for item in category['items']
+                    if item.get('is_archived', False)
+                ]
+
+        self.tree_widget.clear()
+        self.populate_tree(filtered_structure)
+
+        # Update stats label
+        types_str = ', '.join(sorted(self.active_type_filters))
+        filter_msg = f"🔍 Mostrando tipos: {types_str}"
+        if self.active_filter:
+            filter_msg += f" (y {self.active_filter})"
+        self.stats_label.setText(filter_msg)
+
+        logger.info(f"Type filters applied: {self.active_type_filters}")
+
     def reset_filters(self):
         """Reset all filters and show all data"""
         logger.info("Resetting filters...")
@@ -1621,6 +1800,10 @@ class StructureDashboard(QDialog):
         self.search_bar.clear_search()
         # Desmarcar todos los filtros
         self.set_active_filter(None)
+        # Clear type filters
+        self.active_type_filters.clear()
+        for btn in self.type_filter_buttons.values():
+            btn.setChecked(False)
         # Reload full structure
         self.tree_widget.clear()
         self.populate_tree(self.structure)

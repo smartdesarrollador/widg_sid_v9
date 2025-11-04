@@ -287,6 +287,38 @@ class GlobalSearchPanel(QWidget):
                 item.category_icon = item_dict.get('category_icon', '')
                 item.category_color = item_dict.get('category_color', '')
 
+                # Parse date fields from database (SQLite returns strings)
+                from datetime import datetime
+                if item_dict.get('created_at'):
+                    try:
+                        # SQLite datetime format: 'YYYY-MM-DD HH:MM:SS' or ISO format
+                        created_at_str = item_dict['created_at']
+                        if 'T' in created_at_str:
+                            # ISO format
+                            item.created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                        else:
+                            # SQLite format
+                            item.created_at = datetime.strptime(created_at_str, '%Y-%m-%d %H:%M:%S')
+                    except (ValueError, TypeError) as e:
+                        logger.debug(f"Could not parse created_at '{item_dict.get('created_at')}': {e}")
+                        item.created_at = datetime.now()
+
+                if item_dict.get('last_used'):
+                    try:
+                        last_used_str = item_dict['last_used']
+                        if 'T' in last_used_str:
+                            # ISO format
+                            item.last_used = datetime.fromisoformat(last_used_str.replace('Z', '+00:00'))
+                        else:
+                            # SQLite format
+                            item.last_used = datetime.strptime(last_used_str, '%Y-%m-%d %H:%M:%S')
+                    except (ValueError, TypeError) as e:
+                        logger.debug(f"Could not parse last_used '{item_dict.get('last_used')}': {e}")
+                        item.last_used = datetime.now()
+
+                # Parse use_count
+                item.use_count = item_dict.get('use_count', 0)
+
                 self.all_items.append(item)
             except Exception as e:
                 logger.error(f"Error converting item {item_dict.get('id')}: {e}")
