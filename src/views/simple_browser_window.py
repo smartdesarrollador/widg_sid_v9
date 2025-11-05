@@ -11,12 +11,12 @@ from ctypes import wintypes
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
-    QPushButton, QLabel, QApplication, QTabWidget, QTabBar, QMenu
+    QPushButton, QLabel, QApplication, QTabWidget, QTabBar, QMenu, QFrame
 )
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QTimer
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile, QWebEnginePage
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QKeyEvent
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +121,149 @@ class CustomWebEngineView(QWebEngineView):
         # Mostrar menú en la posición guardada del click derecho
         if self.context_menu_pos:
             context_menu.exec(self.context_menu_pos)
+
+
+# ===========================================================================
+# Search Bar Widget for Web Browser
+# ===========================================================================
+class BrowserSearchBar(QFrame):
+    """
+    Barra de búsqueda para el navegador web.
+    Se muestra con Ctrl+F y permite buscar texto en la página actual.
+    """
+
+    # Señales
+    closed = pyqtSignal()
+    search_requested = pyqtSignal(str, bool)  # texto, forward (True=siguiente, False=anterior)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setup_ui()
+
+    def setup_ui(self):
+        """Configurar interfaz de la barra de búsqueda"""
+        self.setObjectName("searchBar")
+        self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(5)
+
+        # Label
+        label = QLabel("Buscar:")
+        label.setStyleSheet("color: #00d4ff; font-weight: bold;")
+        layout.addWidget(label)
+
+        # Campo de búsqueda
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Escribe para buscar...")
+        self.search_input.returnPressed.connect(self.on_search_next)
+        self.search_input.textChanged.connect(self.on_text_changed)
+        layout.addWidget(self.search_input)
+
+        # Botón anterior
+        self.prev_btn = QPushButton("◀")
+        self.prev_btn.setFixedWidth(35)
+        self.prev_btn.setToolTip("Anterior (Shift+F3)")
+        self.prev_btn.clicked.connect(self.on_search_previous)
+        layout.addWidget(self.prev_btn)
+
+        # Botón siguiente
+        self.next_btn = QPushButton("▶")
+        self.next_btn.setFixedWidth(35)
+        self.next_btn.setToolTip("Siguiente (F3 o Enter)")
+        self.next_btn.clicked.connect(self.on_search_next)
+        layout.addWidget(self.next_btn)
+
+        # Label de resultados
+        self.results_label = QLabel("")
+        self.results_label.setStyleSheet("color: #00d4ff; font-size: 10px;")
+        self.results_label.setMinimumWidth(80)
+        layout.addWidget(self.results_label)
+
+        # Botón cerrar
+        close_btn = QPushButton("✕")
+        close_btn.setFixedWidth(30)
+        close_btn.setToolTip("Cerrar (Esc)")
+        close_btn.clicked.connect(self.close_search)
+        layout.addWidget(close_btn)
+
+        # Estilos
+        self.setStyleSheet("""
+            #searchBar {
+                background-color: #16213e;
+                border: 2px solid #00d4ff;
+                border-radius: 5px;
+            }
+            QLineEdit {
+                background-color: #0f3460;
+                color: #ffffff;
+                border: 1px solid #00d4ff;
+                border-radius: 3px;
+                padding: 5px;
+                font-size: 12px;
+            }
+            QLineEdit:focus {
+                border: 2px solid #00d4ff;
+            }
+            QPushButton {
+                background-color: #0f3460;
+                color: #00d4ff;
+                border: 1px solid #00d4ff;
+                border-radius: 3px;
+                padding: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #16213e;
+                border: 2px solid #00d4ff;
+            }
+            QPushButton:pressed {
+                background-color: #00d4ff;
+                color: #1a1a2e;
+            }
+        """)
+
+    def on_text_changed(self, text):
+        """Handler cuando cambia el texto de búsqueda"""
+        if text:
+            self.search_requested.emit(text, True)  # Buscar hacia adelante
+
+    def on_search_next(self):
+        """Buscar siguiente coincidencia"""
+        text = self.search_input.text()
+        if text:
+            self.search_requested.emit(text, True)
+
+    def on_search_previous(self):
+        """Buscar anterior coincidencia"""
+        text = self.search_input.text()
+        if text:
+            self.search_requested.emit(text, False)
+
+    def close_search(self):
+        """Cerrar barra de búsqueda"""
+        self.closed.emit()
+        self.hide()
+
+    def show_and_focus(self):
+        """Mostrar barra y dar foco al campo de búsqueda"""
+        self.show()
+        self.search_input.setFocus()
+        self.search_input.selectAll()
+
+    def keyPressEvent(self, event: QKeyEvent):
+        """Manejar eventos de teclado"""
+        if event.key() == Qt.Key.Key_Escape:
+            self.close_search()
+        elif event.key() == Qt.Key.Key_F3:
+            if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                self.on_search_previous()
+            else:
+                self.on_search_next()
+        else:
+            super().keyPressEvent(event)
+
 
 # ===========================================================================
 # Windows AppBar API Constants and Structures
@@ -255,6 +398,13 @@ class SimpleBrowserWindow(QWidget):
         # Barra de herramientas secundaria (marcadores, sesiones, etc)
         tools_bar = self._create_tools_bar()
         main_layout.addLayout(tools_bar)
+
+        # Barra de búsqueda (inicialmente oculta)
+        self.search_bar = BrowserSearchBar(self)
+        self.search_bar.hide()
+        self.search_bar.search_requested.connect(self.on_search_text)
+        self.search_bar.closed.connect(self.on_search_closed)
+        main_layout.addWidget(self.search_bar)
 
         # QTabWidget para pestañas
         self.tab_widget = QTabWidget()
@@ -1612,6 +1762,71 @@ class SimpleBrowserWindow(QWidget):
             logger.error(f"Error al restaurar última sesión: {e}")
             # En caso de error, cargar URL inicial
             QTimer.singleShot(100, lambda: self.load_url(self.url))
+
+    # ==================== Search Functionality ====================
+
+    def on_search_text(self, text: str, forward: bool):
+        """
+        Buscar texto en la página actual.
+
+        Args:
+            text: Texto a buscar
+            forward: True para buscar hacia adelante, False para buscar hacia atrás
+        """
+        browser = self.get_current_browser()
+        if not browser:
+            return
+
+        # Usar la API de QWebEngineView para buscar texto
+        from PyQt6.QtWebEngineCore import QWebEnginePage
+
+        if forward:
+            browser.findText(text)
+        else:
+            # Buscar hacia atrás
+            browser.findText(text, QWebEnginePage.FindFlag.FindBackward)
+
+        logger.debug(f"Buscando: '{text}' (forward={forward})")
+
+    def on_search_closed(self):
+        """Handler cuando se cierra la barra de búsqueda"""
+        # Limpiar resaltado de búsqueda
+        browser = self.get_current_browser()
+        if browser:
+            browser.findText("")  # Limpiar búsqueda
+        logger.debug("Búsqueda cerrada")
+
+    def show_search_bar(self):
+        """Mostrar barra de búsqueda"""
+        self.search_bar.show_and_focus()
+        logger.debug("Barra de búsqueda mostrada")
+
+    def keyPressEvent(self, event: QKeyEvent):
+        """Manejar eventos de teclado para atajos"""
+        # Ctrl+F: Mostrar barra de búsqueda
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_F:
+            self.show_search_bar()
+            event.accept()
+            return
+
+        # F3: Buscar siguiente
+        elif event.key() == Qt.Key.Key_F3:
+            if self.search_bar.isVisible():
+                if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                    self.search_bar.on_search_previous()
+                else:
+                    self.search_bar.on_search_next()
+                event.accept()
+                return
+
+        # Esc: Cerrar búsqueda si está visible
+        elif event.key() == Qt.Key.Key_Escape:
+            if self.search_bar.isVisible():
+                self.search_bar.close_search()
+                event.accept()
+                return
+
+        super().keyPressEvent(event)
 
     # ==================== Eventos ====================
 
